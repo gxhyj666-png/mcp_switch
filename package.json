@@ -1,6 +1,6 @@
 {
   "name": "dsh-mcp-panel",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "在 DeepSeek Harness 的设置页里列出所有已配置的 MCP 服务器，并逐个开关（写入 cordis.patch.yml，重启宿主后生效）",
   "type": "module",
   "main": "lib/index.js",
@@ -13,6 +13,7 @@
     "lib",
     "examples",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "keywords": [

@@ -14,7 +14,7 @@
 
 - **开关**：切换条目的 `disabled` 标志。文件里只动这一行，其余字节完全不动。
 - **待生效标记**：插件在每次启动时把自己实际加载到的状态写进 `<profile>/.mcp-panel-applied.json`，再和当前配置对比。两者不一致时，该条目下方出现「配置为「关闭」，重启后生效」，并且顶部出现横幅 + **立即重启** 按钮。
-- **立即重启**：弹一次确认，然后拉起一个分离的 PowerShell 等待 0.9 秒、杀掉 `DSH Desktop`、3 秒后重新启动。
+- **立即重启**：弹一次确认，然后调用 DSH Desktop 自己的有序重启接口 `POST /api/desktop/restart`（设置页右上角那个「重启」用的是同一套机制：先回执渲染进程，再重启）。只有该接口不可用时，才回退到插件自己的 `/dsh-mcp-panel/restart`（Windows 下通过计划任务调度 —— 宿主直接 spawn 的子进程会被 job 对象连带收走，实测跑不到执行那一步）。
 
 ## 使用流程（三张图）
 
@@ -178,7 +178,7 @@ pnpm add file:D:\path\to\mcp_switch
 |---|---|---|
 | GET | `/dsh-mcp-panel/state` | 返回 `{ patchPath, exists, updatedAt, bootedAt, hostPid, pendingRestart, entries[] }` |
 | POST | `/dsh-mcp-panel/toggle` | 体：`{ "id": "mcp-playwright", "enabled": false }`；返回 `{ changed, state }` |
-| POST | `/dsh-mcp-panel/restart` | 调度一次重启，返回 202；**仅 win32 实现**，其他平台返回 500 |
+| POST | `/dsh-mcp-panel/restart` | **回退路径**：Windows 下经 `schtasks` 调度一次重启，返回 `{ scheduled: true, via: 'schtasks', task }`；非 win32 返回 500。面板优先用 DSH Desktop 的 `POST /api/desktop/restart`，只有它不可用时才走这里。 |
 
 `entries[]` 每一项：`{ id, serverName, transport, command, url, args, enabled, booted, pendingRestart }`。
 
@@ -189,7 +189,7 @@ pnpm add file:D:\path\to\mcp_switch
 - **不热生效**：见上文，这是上游行为，插件用「待生效」标记把真相摆出来。
 - **示例链路是 Edge**：本项目以 Windows + DSH Desktop + Microsoft Edge 为基准验证。示例条目里的 `--cdp-endpoint=msedge` 只对 Edge 生效；要接管 Chrome 就改成 `chrome`，要接任意 Chromium 就用 `--cdp-endpoint=http://127.0.0.1:<端口>` 或 `ws://…/devtools/browser/<id>`。无论哪种，那个浏览器都必须先打开 `…://inspect/#remote-debugging` 里的「Allow remote debugging」开关，且 Edge/Chrome 重启后要重新勾。
 - **只读写一个文件**：当前 profile 的 `cordis.patch.yml`。写在其它 overlay（`--patch` 传进来的额外文件）里的 MCP 条目面板看不到。
-- **重启只在 Windows 实现**：`/restart` 硬编码了 `DSH Desktop.exe` 的路径与 PowerShell。macOS/Linux 上请手动重启，或欢迎 PR。
+- **重启回退路径只在 Windows 实现**：面板的「立即重启」优先走 DSH Desktop 自带的 `/api/desktop/restart`，那条是跨平台的；只有它不存在时才会用插件自己的 `/restart`，而后者依赖 `schtasks` 与 `DSH Desktop.exe` 的固定安装路径，仅 Windows 可用。macOS/Linux 上请用应用自带的重启入口。
 - **依赖行文本解析**：为了不多带依赖、并且保证写入时不动别的字节，插件用行扫描解析 YAML，而不是真正的 YAML 解析器。它只认识 `- id:` 开头的条目块和 `id / name / disabled / serverName / transport / command / url / args` 这几个键。花式写法（锚点、多行标量、流式 map）不保证能认。
 - **外部 HTTP 不可用**：受 DSH Desktop 的能力头限制，见上。
 
