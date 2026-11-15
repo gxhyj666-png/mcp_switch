@@ -13,10 +13,10 @@
 ![MCP 开关面板](docs/step1-switch-off.png)
 
 - **开关**：切换条目的 `disabled` 标志。文件里只动这一行，其余字节完全不动。
-- **待生效标记**：插件在每次启动时把自己实际加载到的状态写进 `<profile>/.mcp-panel-applied.json`，再和当前配置对比。两者不一致时，该条目下方出现「配置为「关闭」，重启后生效」，并且顶部出现横幅 + **立即重启** 按钮。
-- **立即重启**：弹一次确认，然后拉起一个分离的 PowerShell 等待 0.9 秒、杀掉 `DSH Desktop`、3 秒后重新启动。
+- **待生效标记**：插件在每次启动时把自己实际加载到的状态写进 `<profile>/.mcp-panel-applied.json`，再和当前配置对比。两者不一致时，该条目下方出现「配置为「关闭」，重启后生效」，并且顶部出现「有未生效的改动」横幅。
+- **应用改动**：用设置页右上角的 **「重启 ⌄」→「重启」**（应用自带的有序重启）。面板横幅里那个 **「立即重启」按钮目前不可靠** —— 见[已知限制](#已知限制)。
 
-## 使用流程（三张图）
+## 使用流程（四张图）
 
 > 截图来自 DSH Desktop 2.0.11（Windows）。
 
@@ -24,13 +24,17 @@
 
 ![打开面板](docs/step1-switch-off.png)
 
-**② 点右侧开关**，配置立刻改写（此时 MCP 进程还没变）。
+**② 点右侧开关**，配置立刻改写；此时顶部会出现「有未生效的改动 —— 需要重启 DSH Desktop」。
 
 ![点击开关](docs/step2-click.png)
 
-**③ 顶部出现「有未生效的改动」，点「立即重启」**，重启后开关状态与进程才真正一致。
+**③ 用设置页右上角「重启 ⌄」→「重启」应用改动。**
 
-![待生效与立即重启](docs/step3-pending.png)
+![重启菜单](docs/step3-restart-menu.png)
+
+**④ 重启后回到面板**：横幅消失，开关状态就是真正在运行的状态，「宿主 PID / 启动于」也会变成新值。
+
+![已生效](docs/step4-applied.png)
 
 ---
 
@@ -187,6 +191,7 @@ pnpm add file:D:\path\to\mcp_switch
 ## 已知限制
 
 - **不热生效**：见上文，这是上游行为，插件用「待生效」标记把真相摆出来。
+- **面板里的「立即重启」按钮目前不可靠（0.1.0 已知问题）**：它靠宿主 `spawn` 一个分离的 PowerShell 去杀进程再拉起，但这个子进程会随宿主所属的 job 对象一起被回收 —— 实测能拿到 pid，却来不及执行任何动作，点了等于没点。**请改用设置页右上角「重启 ⌄」→「重启」**（应用自带的有序重启）。修好之前不要依赖那个按钮里弹出的确认框。
 - **示例链路是 Edge**：本项目以 Windows + DSH Desktop + Microsoft Edge 为基准验证。示例条目里的 `--cdp-endpoint=msedge` 只对 Edge 生效；要接管 Chrome 就改成 `chrome`，要接任意 Chromium 就用 `--cdp-endpoint=http://127.0.0.1:<端口>` 或 `ws://…/devtools/browser/<id>`。无论哪种，那个浏览器都必须先打开 `…://inspect/#remote-debugging` 里的「Allow remote debugging」开关，且 Edge/Chrome 重启后要重新勾。
 - **只读写一个文件**：当前 profile 的 `cordis.patch.yml`。写在其它 overlay（`--patch` 传进来的额外文件）里的 MCP 条目面板看不到。
 - **重启只在 Windows 实现**：`/restart` 硬编码了 `DSH Desktop.exe` 的路径与 PowerShell。macOS/Linux 上请手动重启，或欢迎 PR。
