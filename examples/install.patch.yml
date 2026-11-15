@@ -1,0 +1,9 @@
+# 把这个 insert 块追加到下面这个文件的顶层数组里：
+#   <DSH_HOME>/profiles/<profile>/cordis.patch.yml
+# Windows 上通常是 C:\Users\<你>\.dsh\profiles\desktop\cordis.patch.yml
+- insert:
+    - id: mcp-panel
+      name: dsh-mcp-panel
+      # 可选：指定要读写哪个 patch 文件（默认按 --profile / $DSH_PROFILE / desktop 推导）
+      # config:
+      #   patchPath: 'C:\Users\<你>\.dsh\profiles\desktop\cordis.patch.yml'
