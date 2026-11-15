@@ -24,6 +24,14 @@
     "cordis"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gxhyj666-png/mcp_switch.git"
+  },
+  "homepage": "https://github.com/gxhyj666-png/mcp_switch#readme",
+  "bugs": {
+    "url": "https://github.com/gxhyj666-png/mcp_switch/issues"
+  },
   "engines": {
     "node": ">=20"
   },
