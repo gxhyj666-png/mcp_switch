@@ -4,6 +4,8 @@
 
 > 一句话：DSH 没有管理 MCP 的界面，MCP 服务器只是 patch 文件里的一个 Loader 条目；这个插件把那些条目变成可以点的一排开关。
 
+**基准环境：Windows 上的 DSH Desktop + Microsoft Edge。** 项目里的示例 MCP 服务器是 `@playwright/mcp`，用 `--cdp-endpoint=msedge` 接管你**已经打开的 Edge**（复用登录态、Cookie、扩展和现有标签页），所以必须先在 Edge 里打开远程调试开关 —— 见 [Edge 远程调试](#edge-远程调试给-mcp-用)。面板本身不绑定浏览器：它只是读写 patch 里的 MCP 条目，换成 Chrome 只要把示例里的 `msedge` 改成 `chrome`（详见[已知限制](#已知限制)）。
+
 ---
 
 ## 它长什么样
@@ -29,6 +31,41 @@
 **③ 顶部出现「有未生效的改动」，点「立即重启」**，重启后开关状态与进程才真正一致。
 
 ![待生效与立即重启](docs/step3-pending.png)
+
+---
+
+## Edge 远程调试（给 MCP 用）
+
+本项目基于 **Microsoft Edge** 验证和运行。示例 MCP 服务器（`@playwright/mcp`）不是另开一个干净的浏览器，而是通过 `--cdp-endpoint=msedge` **接管你正在用的那一个 Edge 实例**，所以你在页面里的登录态、Cookie、已装扩展、已打开的标签页全都直接可用。
+
+代价是：Edge 默认不对外暴露调试端口，必须手动开一次开关。
+
+1. 在 Edge 地址栏打开 **`edge://inspect/#remote-debugging`**
+2. 勾选 **Allow remote debugging for this browser instance**
+   （允许对此浏览器实例进行远程调试）
+3. 不用关这个标签页，也不用重启 DSH，直接回去用即可
+
+这个开关是**实例级**的：Edge 完全退出再启动后需要**重新勾一次**。勾上之后，Edge 才会在 `127.0.0.1:9222` 上暴露 CDP 端点（端口号可能变，实际端口和浏览器 id 写在 `<Edge User Data>\DevToolsActivePort` 里）。
+
+**没勾会怎样**，两种典型报错：
+
+```
+Could not connect to msedge.
+Make sure msedge is running with remote debugging enabled.
+Navigate to chrome://inspect/#remote-debugging and check
+"Allow remote debugging for this browser instance".
+```
+
+```
+WebSocket error: ws://127.0.0.1:9222/devtools/browser/<id> 403 Forbidden
+Connection rejected
+```
+
+第一种是端口上根本没有可连的调试会话；第二种是端口在监听但握手被拒（多半是那个浏览器实例的开关已经被关掉、或者 `DevToolsActivePort` 里记的还是上一个实例的 id）。两者的处理方式一样：
+
+**排错顺序**：① 回到 `edge://inspect/#remote-debugging` 确认开关还勾着 → ② 看 `DevToolsActivePort` 里的 id 是否和当前 Edge 进程对得上 → ③ 都不行就彻底退出 Edge（任务栏托盘也要退）再重开，然后重新勾一次。
+
+> 用 Chrome 的话把地址换成 `chrome://inspect/#remote-debugging`，配置里的 `--cdp-endpoint=msedge` 换成 `chrome`。
 
 
 ---
@@ -129,6 +166,8 @@ pnpm add file:D:\path\to\mcp_switch
 
 面板会显示 `serverName` 和拼好的命令行（stdio）或 `url`（streamable-http）。`disabled: true`、`disabled: !!js ...` 都算关闭（除非字面量是 `false`）。
 
+上面这个 `--cdp-endpoint=msedge` 的例子要能用，前提是 Edge 那边勾了远程调试开关，见 [Edge 远程调试](#edge-远程调试给-mcp-用)。
+
 ---
 
 ## HTTP 接口
@@ -148,6 +187,7 @@ pnpm add file:D:\path\to\mcp_switch
 ## 已知限制
 
 - **不热生效**：见上文，这是上游行为，插件用「待生效」标记把真相摆出来。
+- **示例链路是 Edge**：本项目以 Windows + DSH Desktop + Microsoft Edge 为基准验证。示例条目里的 `--cdp-endpoint=msedge` 只对 Edge 生效；要接管 Chrome 就改成 `chrome`，要接任意 Chromium 就用 `--cdp-endpoint=http://127.0.0.1:<端口>` 或 `ws://…/devtools/browser/<id>`。无论哪种，那个浏览器都必须先打开 `…://inspect/#remote-debugging` 里的「Allow remote debugging」开关，且 Edge/Chrome 重启后要重新勾。
 - **只读写一个文件**：当前 profile 的 `cordis.patch.yml`。写在其它 overlay（`--patch` 传进来的额外文件）里的 MCP 条目面板看不到。
 - **重启只在 Windows 实现**：`/restart` 硬编码了 `DSH Desktop.exe` 的路径与 PowerShell。macOS/Linux 上请手动重启，或欢迎 PR。
 - **依赖行文本解析**：为了不多带依赖、并且保证写入时不动别的字节，插件用行扫描解析 YAML，而不是真正的 YAML 解析器。它只认识 `- id:` 开头的条目块和 `id / name / disabled / serverName / transport / command / url / args` 这几个键。花式写法（锚点、多行标量、流式 map）不保证能认。
